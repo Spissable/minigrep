@@ -8,40 +8,46 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(args: &[String], case_sensitive: bool) -> Result<Config, ()> {
-        if args.len() < 3 {
-            return Err(());
-        }
+    pub fn new(mut args: std::env::Args, case_sensitive: bool) -> Result<Config, &'static str> {
+        args.next();
+
+        let query = match args.next() {
+            Some(query) => query,
+            None => return Err("Missing argument query"),
+        };
+
+        let filename = match args.next() {
+            Some(filename) => filename,
+            None => return Err("Missing argument filename"),
+        };
 
         Ok(Config {
-            query: args[1].clone(),
-            filename: args[2].clone(),
+            query,
+            filename,
             case_sensitive,
         })
     }
 }
 
 pub fn search<'a>(query: &str, contents: &'a str, case_sensitive: bool) -> Vec<&'a str> {
-    let mut result = Vec::new();
-    let query_lowercase = query.to_lowercase();
-
-    for line in contents.lines() {
-        if (case_sensitive && line.contains(query))
-            || (!case_sensitive && line.to_lowercase().contains(&query_lowercase))
-        {
-            result.push(line);
-        }
+    match case_sensitive {
+        true => contents
+            .lines()
+            .filter(|line| line.contains(query))
+            .collect(),
+        false => contents
+            .lines()
+            .filter(|line| line.to_lowercase().contains(&query.to_lowercase()))
+            .collect(),
     }
-
-    result
 }
 
 pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
     let contents = fs::read_to_string(config.filename)?;
 
-    for line in search(&config.query, &contents, config.case_sensitive) {
-        println!("{}", line);
-    }
+    search(&config.query, &contents, config.case_sensitive)
+        .iter()
+        .for_each(|line| println!("{}", line));
 
     Ok(())
 }
